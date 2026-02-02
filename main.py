@@ -18,6 +18,10 @@ st.markdown("""
         button[id="tabs-bui3-tab-1"] { 
             display: none !important;
         }
+        /* Ẩn toàn bộ thanh chứa các Tab */
+        div[data-baseweb="tab-list"] {
+            display: none !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -96,4 +100,5 @@ with tab2:
             for old, r in zip(found, res):
                 if r.get('shortLink'): new_con = new_con.replace(old, r['shortLink'])
             st.code(new_con)
+
 
