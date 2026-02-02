@@ -1,97 +1,80 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+import streamlit as st
 import requests
 import json
-import os
 import re
 
-app = FastAPI()
+# --- CẤU HÌNH GIAO DIỆN ĐỂ NHÚNG VÀO PHP ---
+st.set_page_config(layout="wide")
 
-class LinkRequest(BaseModel):
-    url: str
-    subId1: str = None
-
-def get_csrf_token(cookie_str):
-    # Tìm giá trị csrftoken trong chuỗi cookie
-    match = re.search(r'csrftoken=([a-zA-Z0-9]+)', cookie_str)
-    if match:
-        return match.group(1)
-    return None
-
-@app.post("/convert")
-async def convert_link(req: LinkRequest):
-    # 1. Lấy và làm sạch Cookie
-    raw_cookie = os.getenv("SHOPEE_COOKIE", "").strip()
-    if raw_cookie.startswith('"') and raw_cookie.endswith('"'):
-        raw_cookie = raw_cookie[1:-1]
-
-    if not raw_cookie:
-        return {"status": "error", "message": "Chua co Cookie tren Render"}
-
-    # 2. Trích xuất CSRF Token (Chìa khóa quan trọng để fix lỗi 90309999)
-    csrf_token = get_csrf_token(raw_cookie)
-    
-    # 3. Giả lập trình duyệt Chrome 100%
-    url = "https://affiliate.shopee.vn/api/v3/gql?q=batchCustomLink"
-    headers = {
-        "authority": "affiliate.shopee.vn",
-        "accept": "*/*",
-        "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-        "content-type": "application/json",
-        "cookie": raw_cookie,
-        "origin": "https://affiliate.shopee.vn",
-        "referer": "https://affiliate.shopee.vn/offer/custom_link",
-        "sec-ch-ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        # QUAN TRỌNG: Thêm CSRF Token vào Header
-        "x-csrftoken": csrf_token if csrf_token else "missing"
-    }
-
-    payload = {
-        "operationName": "batchGetCustomLink",
-        "query": "query batchGetCustomLink($linkParams: [CustomLinkParam!], $sourceCaller: SourceCaller) { batchCustomLink(linkParams: $linkParams, sourceCaller: $sourceCaller) { shortLink failCode } }",
-        "variables": {
-            "linkParams": [{"originalLink": req.url, "advancedLinkParams": {"subId1": req.subId1} if req.subId1 else {}}],
-            "sourceCaller": "CUSTOM_LINK_CALLER"
-        }
-    }
-
-    try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=15)
-        data = resp.json()
-        
-        # --- DEBUG CHI TIẾT ---
-        if 'error' in data.get('raw_shopee', {}) or data.get('error'):
-             return {
-                "status": "error",
-                "message": "Shopee van chan IP Render (Error 90309999).",
-                "suggestion": "Cookie ok, Token ok, nhung IP Render bi blacklist.",
-                "debug_info": data
+# Ẩn Menu và Footer của Streamlit để nhìn cho giống API
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .block-container {
+                padding-top: 0rem;
+                padding-bottom: 0rem;
+                padding-left: 1rem;
+                padding-right: 1rem;
             }
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-        # Xử lý kết quả bình thường
-        results = data.get('data', {}).get('batchCustomLink')
-        if results and len(results) > 0:
-            res = results[0]
-            if res.get('shortLink'):
-                return {"status": "success", "shortLink": res['shortLink']}
-            else:
-                 return {"status": "error", "message": f"Shopee tu choi link nay. FailCode: {res.get('failCode')}"}
+# --- LOGIC XỬ LÝ (Giữ nguyên logic cũ của bạn) ---
+def get_shopee_link(original_url):
+    # Lấy cookie từ Secrets của Streamlit
+    if "SHOPEE_COOKIE" in st.secrets:
+        cookie_str = st.secrets["SHOPEE_COOKIE"]
+    else:
+        return "Lỗi: Chưa cấu hình Secrets"
+
+    headers = {
+        "content-type": "application/json",
+        "cookie": cookie_str,
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "referer": "https://affiliate.shopee.vn/"
+    }
+    
+    # Logic gọi API Shopee
+    try:
+        payload = {
+            "operationName": "batchGetCustomLink",
+            "query": "query batchGetCustomLink($linkParams: [CustomLinkParam!], $sourceCaller: SourceCaller) { batchCustomLink(linkParams: $linkParams, sourceCaller: $sourceCaller) { shortLink failCode } }",
+            "variables": {
+                "linkParams": [{"originalLink": original_url}],
+                "sourceCaller": "CUSTOM_LINK_CALLER"
+            }
+        }
+        resp = requests.post("https://affiliate.shopee.vn/api/v3/gql?q=batchCustomLink", headers=headers, json=payload, timeout=10)
+        data = resp.json()
+        results = data.get('data', {}).get('batchCustomLink', [])
         
-        # Nếu vẫn lỗi
-        if 'errors' in data:
-             return {"status": "error", "message": data['errors'][0].get('message')}
-
-        return {"status": "error", "message": "Unknown Response", "raw": data}
-
+        if results:
+            return results[0].get('shortLink', f"Lỗi failCode: {results[0].get('failCode')}")
+        return "Lỗi: Không có kết quả trả về"
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return f"Lỗi hệ thống: {str(e)}"
 
-@app.get("/")
-async def home():
-    return "API Ready"
+# --- PHẦN QUAN TRỌNG: NHẬN LINK TỪ PHP ---
+# Lấy tham số ?url=... từ trên thanh địa chỉ
+query_params = st.query_params
+url_input = query_params.get("url", None)
+
+# Giao diện hiển thị kết quả
+st.markdown("### Kết quả chuyển đổi:")
+
+if url_input:
+    # Nếu có link trên thanh địa chỉ thì tự động chạy
+    with st.spinner(f'Đang xử lý: {url_input} ...'):
+        short_link = get_shopee_link(url_input)
+        
+    if "http" in short_link:
+        st.success("Thành công!")
+        st.code(short_link, language="text")
+        st.markdown(f"[Bấm để mở link]({short_link})")
+    else:
+        st.error(short_link)
+else:
+    st.info("Vui lòng nhập link từ giao diện bên ngoài.")
