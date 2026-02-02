@@ -8,42 +8,21 @@ import time
 st.set_page_config(page_title="Shopee Tool", layout="centered")
 
 st.markdown("""
-    <style>
-        /* Ẩn các thành phần thừa */
-        header, footer, div[data-testid="stExpander"], div[data-baseweb="tab-list"] { 
-            display: none !important; 
-        }
+    <style>
+        /* Ẩn phần Expander (Cấu hình SubID) */
+        div[data-testid="stExpander"] {
+            display: none !important;
+        }
 
-        /* Tối ưu khung nền cho việc nhúng (Embed) */
-        .main {
-            background-color: #f7f9fc;
-        }
-        
-        .block-container {
-            padding: 1rem !important;
-            max-width: 100% !important;
-        }
-
-        /* Làm đẹp ô nhập liệu */
-        .stTextArea textarea {
-            border: 1px solid #e0e0e0 !important;
-            border-radius: 15px !important;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05) !important;
-            font-size: 16px !important;
-        }
-
-        /* Làm đẹp nút bấm kiểu Shopee */
-        .stButton button {
-            background-color: #ff4d2d !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 15px !important;
-            height: 55px !important;
-            font-size: 18px !important;
-            box-shadow: 0 4px 15px rgba(255, 77, 45, 0.3) !important;
-            transition: all 0.3s ease;
-        }
-    </style>
+        /* Ẩn Tab thứ 2 (Content) */
+        button[id="tabs-bui3-tab-1"] { 
+            display: none !important;
+        }
+        /* Ẩn toàn bộ thanh chứa các Tab */
+        div[data-baseweb="tab-list"] {
+            display: none !important;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
 # CSS tối giản, chỉ ẩn footer để giảm tải cho Safari
