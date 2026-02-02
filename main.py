@@ -4,20 +4,6 @@ import json
 import re
 import time
 
-st.markdown("""
-    <style>
-        /* Ẩn phần Expander (Cấu hình SubID) */
-        div[data-testid="stExpander"] {
-            display: none !important;
-        }
-
-        /* Ẩn Tab thứ 2 (Content) */
-        button[id="tabs-bui3-tab-1"] { 
-            display: none !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 # Cấu hình cơ bản nhất, không dùng CSS phức tạp để tránh lỗi trình duyệt
 st.set_page_config(page_title="Shopee Tool", layout="centered")
 
@@ -96,3 +82,4 @@ with tab2:
             for old, r in zip(found, res):
                 if r.get('shortLink'): new_con = new_con.replace(old, r['shortLink'])
             st.code(new_con)
+
