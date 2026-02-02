@@ -10,33 +10,24 @@ class LinkRequest(BaseModel):
     url: str
     subId1: str = None
 
-def process_cookie_input(raw_input):
-    if not raw_input: return ""
-    try:
-        cookie_data = json.loads(raw_input)
-        if isinstance(cookie_data, dict) and "cookies" in cookie_data:
-            cookies_list = cookie_data["cookies"]
-        elif isinstance(cookie_data, list):
-            cookies_list = cookie_data
-        else: return raw_input
-        return "; ".join([f"{c['name']}={c['value']}" for c in cookies_list if "name" in c and "value" in c])
-    except: return raw_input
-
 @app.post("/convert")
 async def convert_link(req: LinkRequest):
-    raw_cookie = os.getenv("SHOPEE_COOKIE", "")
-    cookie_str = process_cookie_input(raw_cookie)
+    # Lấy Cookie và xử lý sơ bộ
+    raw_cookie = os.getenv("SHOPEE_COOKIE", "").strip()
     
-    if not cookie_str:
-        return {"status": "error", "message": "API thieu Cookie. Hay kiem tra Render Env."}
+    # Loại bỏ dấu ngoặc kép nếu lỡ tay điền vào Render
+    if raw_cookie.startswith('"') and raw_cookie.endswith('"'):
+        raw_cookie = raw_cookie[1:-1]
+    
+    # Kiểm tra xem Cookie có bị trống không
+    if not raw_cookie:
+        return {"status": "error", "message": "Loi: Cookie tren Render dang bi trong!"}
 
     url = "https://affiliate.shopee.vn/api/v3/gql?q=batchCustomLink"
-    # Header đầy đủ để đánh lừa Shopee
     headers = {
-        "accept": "application/json",
         "content-type": "application/json",
-        "cookie": cookie_str,
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+        "cookie": raw_cookie, 
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "referer": "https://affiliate.shopee.vn/",
         "origin": "https://affiliate.shopee.vn"
     }
@@ -54,23 +45,38 @@ async def convert_link(req: LinkRequest):
         resp = requests.post(url, headers=headers, json=payload, timeout=15)
         data = resp.json()
         
-        # KIỂM TRA LỖI TRƯỚC KHI TRUY CẬP PHẦN TỬ 0
-        results = data.get('data', {}).get('batchCustomLink')
-        
-        if results is None:
-            return {"status": "error", "message": "Shopee tu choi yeu cau (JSON empty)", "raw_shopee": data}
-            
-        if len(results) == 0:
-            return {"status": "error", "message": "Shopee tra ve danh sach rong. Cookie co the bi sai hoac thieu quyen.", "raw_shopee": data}
+        # --- DEBUG QUAN TRỌNG ---
+        # Kiểm tra xem Shopee có báo lỗi authentication không
+        if 'errors' in data:
+            err_msg = data['errors'][0].get('message', 'Unknown Error')
+            return {
+                "status": "error", 
+                "message": f"Shopee tu choi: {err_msg}",
+                "debug_cookie_dau": raw_cookie[:20] + "..." # Xem 20 kytu dau cua cookie de check
+            }
 
-        res = results[0]
+        # Kiểm tra data
+        results = data.get('data')
+        if results is None: 
+            return {
+                "status": "error", 
+                "message": "Shopee tra ve NULL. Kha nang cao la Cookie chet hoac IP bi chan.",
+                "raw_response": data
+            }
+
+        batch_list = results.get('batchCustomLink')
+        if not batch_list:
+            return {"status": "error", "message": "Danh sach link tra ve bi rong. Check lai Link input."}
+
+        res = batch_list[0]
         if res.get('shortLink'):
             return {"status": "success", "shortLink": res['shortLink']}
-        return {"status": "error", "message": f"Loi tu Shopee. failCode: {res.get('failCode')}"}
+        
+        return {"status": "error", "message": f"That bai. FailCode: {res.get('failCode')}"}
 
     except Exception as e:
-        return {"status": "error", "message": f"Loi he thong: {str(e)}"}
+        return {"status": "error", "message": str(e)}
 
 @app.get("/")
-async def health():
-    return {"status": "ok"}
+async def home():
+    return {"message": "API Online"}
