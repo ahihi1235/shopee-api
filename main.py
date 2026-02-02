@@ -7,6 +7,20 @@ import time
 # Cấu hình cơ bản nhất, không dùng CSS phức tạp để tránh lỗi trình duyệt
 st.set_page_config(page_title="Shopee Tool", layout="centered")
 
+st.markdown("""
+    <style>
+        /* Ẩn phần Expander (Cấu hình SubID) */
+        div[data-testid="stExpander"] {
+            display: none !important;
+        }
+
+        /* Ẩn Tab thứ 2 (Content) */
+        button[id="tabs-bui3-tab-1"] { 
+            display: none !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # CSS tối giản, chỉ ẩn footer để giảm tải cho Safari
 st.markdown("""
     <style>
@@ -82,3 +96,4 @@ with tab2:
             for old, r in zip(found, res):
                 if r.get('shortLink'): new_con = new_con.replace(old, r['shortLink'])
             st.code(new_con)
+
