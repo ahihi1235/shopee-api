@@ -52,7 +52,7 @@ else:
     st.stop()
 
 # ===== GIAO DIỆN =====
-st.title("Shopee Affiliate Tool")
+st.title("Chuyển Đổi Link Shopee")
 
 with st.expander("⚙️ Cấu hình SubID"):
     sub_ids = {}
@@ -100,5 +100,6 @@ with tab2:
             for old, r in zip(found, res):
                 if r.get('shortLink'): new_con = new_con.replace(old, r['shortLink'])
             st.code(new_con)
+
 
 
